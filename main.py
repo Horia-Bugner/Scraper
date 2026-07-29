@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 import requests
@@ -63,6 +64,28 @@ def meets_experience_preference(text: str) -> bool:
 def accepts_barcelona_remote_location(location: str) -> bool:
     """Return whether a remote job accepts applicants based in Barcelona."""
     return not location.strip() or bool(BARCELONA_REMOTE_REGIONS.search(location))
+
+
+def normalize_for_dedup(value: str) -> str:
+    """Normalize text so punctuation/case differences do not create duplicates."""
+    ascii_value = unicodedata.normalize("NFKD", value).encode(
+        "ascii", "ignore"
+    ).decode("ascii")
+    return re.sub(r"[^a-z0-9]+", " ", ascii_value.lower()).strip()
+
+
+def job_keys(job: dict) -> set[str]:
+    """
+    Track both the source ID and a title/company fingerprint. The fingerprint
+    catches the same vacancy when multiple job boards publish different URLs.
+    """
+    title = normalize_for_dedup(job.get("title", ""))
+    company = normalize_for_dedup(job.get("company", ""))
+    return {
+        str(job["id"]),  # legacy key retained for existing seen_jobs.json files
+        f"id:{job['id']}",
+        f"job:{company}|{title}",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -378,21 +401,32 @@ def save_seen_ids(ids: set[str]) -> None:
 # 3. Notification
 # ---------------------------------------------------------------------------
 
-def notify_discord(jobs: list[dict]) -> None:
+def notify_discord(jobs: list[dict]) -> list[dict]:
     if not DISCORD_WEBHOOK_URL:
         print("WARNING: DISCORD_WEBHOOK_URL not set, skipping notification.")
-        return
+        return []
 
+    notified = []
     for job in jobs:
         source = job.get("source", "Unknown source")
         content = (
             f"**{job['title']}** at {job['company']}\n"
             f"Source: {source}\n{job['url']}"
         )
-        resp = requests.post(DISCORD_WEBHOOK_URL, json={"content": content})
-        if resp.status_code >= 300:
-            print(f"Failed to notify for job {job['id']}: "
-                  f"{resp.status_code} {resp.text}", file=sys.stderr)
+        try:
+            resp = requests.post(
+                DISCORD_WEBHOOK_URL,
+                json={"content": content},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            notified.append(job)
+        except requests.RequestException as exc:
+            print(
+                f"Failed to notify for job {job['id']}: {exc}",
+                file=sys.stderr,
+            )
+    return notified
 
 
 # ---------------------------------------------------------------------------
@@ -409,13 +443,21 @@ def main() -> None:
         except Exception as e:
             print(f"Scraper {scraper.__name__} failed: {e}", file=sys.stderr)
 
-    new_jobs = [job for job in all_jobs if job["id"] not in seen_ids]
+    new_jobs = []
+    keys_this_run = set(seen_ids)
+    for job in all_jobs:
+        keys = job_keys(job)
+        if keys_this_run.isdisjoint(keys):
+            new_jobs.append(job)
+            keys_this_run.update(keys)
 
     if new_jobs:
         print(f"Found {len(new_jobs)} new job(s).")
-        notify_discord(new_jobs)
-        seen_ids.update(job["id"] for job in new_jobs)
-        save_seen_ids(seen_ids)
+        notified_jobs = notify_discord(new_jobs)
+        for job in notified_jobs:
+            seen_ids.update(job_keys(job))
+        if notified_jobs:
+            save_seen_ids(seen_ids)
     else:
         print("No new jobs found.")
 
