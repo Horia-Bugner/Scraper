@@ -25,10 +25,24 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (personal job-alert script)"}
 # Target roles supplied by the user. Keep this deliberately narrow so generic
 # engineering leads and unrelated "quality manager" roles do not get posted.
 TARGET_TITLE_PATTERN = re.compile(
-    r"\b(?:QA Manager|Test Lead|Test Manager|QA Director|Software QA Manager)\b",
+    r"\b(?:"
+    r"(?:Software )?QA Manager|"
+    r"Quality Assurance Manager|"
+    r"Test Lead|"
+    r"Test Manager|"
+    r"QA Director|"
+    r"Director of (?:QA|Quality Assurance)"
+    r")\b",
     re.IGNORECASE,
 )
 TARGET_LOCATION_PATTERN = re.compile(r"\bBarcelona\b|\bRemote\b", re.IGNORECASE)
+BARCELONA_REMOTE_REGIONS = re.compile(
+    r"\b(?:"
+    r"Anywhere|Worldwide|Global|Europe|European Union|EU|EMEA|"
+    r"Spain|España|Barcelona"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def is_target_title(title: str) -> bool:
@@ -44,6 +58,11 @@ def meets_experience_preference(text: str) -> bool:
         )
     ]
     return not years or max(years) >= 5
+
+
+def accepts_barcelona_remote_location(location: str) -> bool:
+    """Return whether a remote job accepts applicants based in Barcelona."""
+    return not location.strip() or bool(BARCELONA_REMOTE_REGIONS.search(location))
 
 
 # ---------------------------------------------------------------------------
@@ -68,12 +87,21 @@ def scrape_remoteok() -> list[dict]:
         title = item.get("position") or item.get("title") or ""
         if not is_target_title(title):
             continue
+        location = item.get("location") or ""
+        if not accepts_barcelona_remote_location(location):
+            continue
+        description = BeautifulSoup(
+            item.get("description", ""), "html.parser"
+        ).get_text(" ", strip=True)
+        if not meets_experience_preference(description):
+            continue
         url = item.get("url") or f"https://remoteok.com/remote-jobs/{item.get('id')}"
         jobs.append({
             "id": url,
             "title": title,
             "url": url,
             "company": item.get("company", "Unknown"),
+            "source": "Remote OK",
         })
     return jobs
 
@@ -125,6 +153,7 @@ def scrape_eu_institutions(max_pages: int = 3) -> list[dict]:
                 "title": title,
                 "url": url,
                 "company": institution,
+                "source": "EU Careers",
             })
 
     return jobs
@@ -149,10 +178,13 @@ def scrape_jobicy() -> list[dict]:
     jobs = []
     for item in data.get("jobs", []):
         title = item.get("jobTitle", "")
+        location = item.get("jobGeo", "")
         description = BeautifulSoup(
             item.get("jobDescription", ""), "html.parser"
         ).get_text(" ", strip=True)
         if not is_target_title(title):
+            continue
+        if not accepts_barcelona_remote_location(location):
             continue
         if not meets_experience_preference(description):
             continue
@@ -162,6 +194,7 @@ def scrape_jobicy() -> list[dict]:
             "title": title,
             "url": url,
             "company": item.get("companyName", "Unknown"),
+            "source": "Jobicy",
         })
     return jobs
 
@@ -195,13 +228,131 @@ def scrape_weworkremotely() -> list[dict]:
             "title": title,
             "url": url,
             "company": company,
+            "source": "We Work Remotely",
         })
     return jobs
 
 
+def scrape_remotive() -> list[dict]:
+    """Fetch remote listings from Remotive's public API."""
+    resp = requests.get(
+        "https://remotive.com/api/remote-jobs",
+        headers=HEADERS,
+        timeout=20,
+    )
+    resp.raise_for_status()
+
+    jobs = []
+    for item in resp.json().get("jobs", []):
+        title = item.get("title", "")
+        location = item.get("candidate_required_location", "")
+        description = BeautifulSoup(
+            item.get("description", ""), "html.parser"
+        ).get_text(" ", strip=True)
+        if not is_target_title(title):
+            continue
+        if not accepts_barcelona_remote_location(location):
+            continue
+        if not meets_experience_preference(description):
+            continue
+        url = item.get("url", "")
+        jobs.append({
+            "id": f"remotive:{item.get('id') or url}",
+            "title": title,
+            "url": url,
+            "company": item.get("company_name", "Unknown"),
+            "source": "Remotive",
+        })
+    return jobs
+
+
+def scrape_himalayas() -> list[dict]:
+    """Search Himalayas for each target title, including Spain/worldwide jobs."""
+    jobs_by_id = {}
+    searches = [
+        "QA Manager",
+        "Test Lead",
+        "Test Manager",
+        "QA Director",
+        "Software QA Manager",
+    ]
+    for search in searches:
+        resp = requests.get(
+            "https://himalayas.app/jobs/api/search",
+            params={"q": search, "country": "ES", "sort": "recent"},
+            headers=HEADERS,
+            timeout=20,
+        )
+        resp.raise_for_status()
+        for item in resp.json().get("jobs", []):
+            title = item.get("title", "")
+            description = BeautifulSoup(
+                item.get("description", ""), "html.parser"
+            ).get_text(" ", strip=True)
+            if not is_target_title(title):
+                continue
+            if not meets_experience_preference(description):
+                continue
+            url = item.get("applicationLink", "")
+            job_id = str(item.get("guid") or url)
+            jobs_by_id[job_id] = {
+                "id": f"himalayas:{job_id}",
+                "title": title,
+                "url": url,
+                "company": item.get("companyName", "Unknown"),
+                "source": "Himalayas",
+            }
+    return list(jobs_by_id.values())
+
+
+def scrape_arbeitnow(max_pages: int = 3) -> list[dict]:
+    """Fetch recent remote and Barcelona jobs from Arbeitnow's public API."""
+    jobs = []
+    url = "https://www.arbeitnow.com/api/job-board-api"
+    for page in range(1, max_pages + 1):
+        resp = requests.get(
+            url,
+            params={"page": page},
+            headers=HEADERS,
+            timeout=20,
+        )
+        resp.raise_for_status()
+        listings = resp.json().get("data", [])
+        if not listings:
+            break
+        for item in listings:
+            title = item.get("title", "")
+            location = item.get("location", "")
+            is_remote = bool(item.get("remote"))
+            description = BeautifulSoup(
+                item.get("description", ""), "html.parser"
+            ).get_text(" ", strip=True)
+            if not is_target_title(title):
+                continue
+            if not is_remote and not TARGET_LOCATION_PATTERN.search(location):
+                continue
+            if is_remote and location and not accepts_barcelona_remote_location(location):
+                continue
+            if not meets_experience_preference(description):
+                continue
+            job_url = item.get("url", "")
+            jobs.append({
+                "id": f"arbeitnow:{item.get('slug') or job_url}",
+                "title": title,
+                "url": job_url,
+                "company": item.get("company_name", "Unknown"),
+                "source": "Arbeitnow",
+            })
+    return jobs
+
+
 SCRAPERS = [
+    scrape_remoteok,
     scrape_jobicy,
     scrape_weworkremotely,
+    scrape_remotive,
+    scrape_himalayas,
+    scrape_arbeitnow,
     scrape_eu_institutions,
     # add more scraper functions here as you build them out
 ]
@@ -233,7 +384,11 @@ def notify_discord(jobs: list[dict]) -> None:
         return
 
     for job in jobs:
-        content = f"**{job['title']}** at {job['company']}\n{job['url']}"
+        source = job.get("source", "Unknown source")
+        content = (
+            f"**{job['title']}** at {job['company']}\n"
+            f"Source: {source}\n{job['url']}"
+        )
         resp = requests.post(DISCORD_WEBHOOK_URL, json={"content": content})
         if resp.status_code >= 300:
             print(f"Failed to notify for job {job['id']}: "
