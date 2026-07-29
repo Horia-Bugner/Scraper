@@ -22,11 +22,28 @@ SEEN_JOBS_FILE = Path(__file__).parent / "seen_jobs.json"
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (personal job-alert script)"}
 
-# Titles matching this pattern are considered relevant QA roles
-QA_TITLE_PATTERN = re.compile(
-    r"\bQA\b|Quality Assurance", re.IGNORECASE
+# Target roles supplied by the user. Keep this deliberately narrow so generic
+# engineering leads and unrelated "quality manager" roles do not get posted.
+TARGET_TITLE_PATTERN = re.compile(
+    r"\b(?:QA Manager|Test Lead|Test Manager|QA Director|Software QA Manager)\b",
+    re.IGNORECASE,
 )
-SENIORITY_PATTERN = re.compile(r"\bManager\b|\bDirector\b|\bHead\b", re.IGNORECASE)
+TARGET_LOCATION_PATTERN = re.compile(r"\bBarcelona\b|\bRemote\b", re.IGNORECASE)
+
+
+def is_target_title(title: str) -> bool:
+    return bool(TARGET_TITLE_PATTERN.search(title))
+
+
+def meets_experience_preference(text: str) -> bool:
+    """Reject only listings that explicitly cap experience below five years."""
+    years = [
+        int(value)
+        for value in re.findall(
+            r"\b(\d{1,2})\+?\s*(?:years?|yrs?)\b", text, re.IGNORECASE
+        )
+    ]
+    return not years or max(years) >= 5
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +66,7 @@ def scrape_remoteok() -> list[dict]:
     jobs = []
     for item in listings:
         title = item.get("position") or item.get("title") or ""
-        if not (QA_TITLE_PATTERN.search(title) and SENIORITY_PATTERN.search(title)):
+        if not is_target_title(title):
             continue
         url = item.get("url") or f"https://remoteok.com/remote-jobs/{item.get('id')}"
         jobs.append({
@@ -97,6 +114,11 @@ def scrape_eu_institutions(max_pages: int = 3) -> list[dict]:
             url = href if href.startswith("http") else f"https://eu-careers.europa.eu{href}"
 
             institution = cells[3].get_text(strip=True)
+            listing_text = row.get_text(" ", strip=True)
+            if not is_target_title(title):
+                continue
+            if not TARGET_LOCATION_PATTERN.search(listing_text):
+                continue
 
             jobs.append({
                 "id": url,
@@ -127,7 +149,12 @@ def scrape_jobicy() -> list[dict]:
     jobs = []
     for item in data.get("jobs", []):
         title = item.get("jobTitle", "")
-        if not SENIORITY_PATTERN.search(title):
+        description = BeautifulSoup(
+            item.get("jobDescription", ""), "html.parser"
+        ).get_text(" ", strip=True)
+        if not is_target_title(title):
+            continue
+        if not meets_experience_preference(description):
             continue
         url = item.get("url", "")
         jobs.append({
@@ -156,7 +183,10 @@ def scrape_weworkremotely() -> list[dict]:
         raw_title = (item.findtext("title") or "").strip()
         # WWR titles are usually formatted "Company: Job Title"
         title = raw_title.split(":", 1)[-1].strip() if ":" in raw_title else raw_title
-        if not (QA_TITLE_PATTERN.search(title) and SENIORITY_PATTERN.search(title)):
+        description = item.findtext("description") or ""
+        if not is_target_title(title):
+            continue
+        if not meets_experience_preference(description):
             continue
         url = (item.findtext("link") or "").strip()
         company = raw_title.split(":", 1)[0].strip() if ":" in raw_title else "Unknown"
@@ -170,7 +200,6 @@ def scrape_weworkremotely() -> list[dict]:
 
 
 SCRAPERS = [
-    scrape_remoteok,
     scrape_jobicy,
     scrape_weworkremotely,
     scrape_eu_institutions,

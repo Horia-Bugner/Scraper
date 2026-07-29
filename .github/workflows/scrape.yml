@@ -2,31 +2,63 @@ name: Job Scraper
 
 on:
   schedule:
-    - cron: "0 6,12,18 * * *"   # 6am, 12pm, 6pm UTC — adjust to your timezone
-  workflow_dispatch:            # allows manual runs from the Actions tab
+    # Winter in Europe/Bucharest (UTC+2)
+    - cron: "59 5 * * *"
+    - cron: "29 11 * * *"
+    - cron: "19 18 * * *"
+    # Summer in Europe/Bucharest (UTC+3)
+    - cron: "59 4 * * *"
+    - cron: "29 10 * * *"
+    - cron: "19 17 * * *"
+  workflow_dispatch:
 
 permissions:
-  contents: write   # needed to commit updated seen_jobs.json back to the repo
+  contents: write
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
+      - name: Check Bucharest schedule
+        id: schedule
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          offset="$(TZ=Europe/Bucharest date +%z)"
+          if [[ "$offset" == "+0300" && "$EVENT_SCHEDULE" =~ ^(59\ 4|29\ 10|19\ 17) ]] ||
+             [[ "$offset" == "+0200" && "$EVENT_SCHEDULE" =~ ^(59\ 5|29\ 11|19\ 18) ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.schedule.outputs.run == 'true'
 
       - uses: actions/setup-python@v5
+        if: steps.schedule.outputs.run == 'true'
         with:
           python-version: "3.12"
 
       - name: Install dependencies
+        if: steps.schedule.outputs.run == 'true'
         run: pip install -r requirements.txt
 
       - name: Run scraper
+        if: steps.schedule.outputs.run == 'true'
         run: python main.py
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Commit updated seen_jobs.json
+        if: steps.schedule.outputs.run == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

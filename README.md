@@ -1,8 +1,15 @@
 # Job Scraper
 
-Checks configured job sites for new listings and posts them to a Discord
-channel via webhook. Runs automatically 3x/day via GitHub Actions — no
-server needed.
+Checks Jobicy, We Work Remotely, and EU Careers for QA Manager, Test Lead,
+Test Manager, QA Director, and Software QA Manager openings. Results are
+limited to remote roles or Barcelona and favor roles requiring at least five
+years of experience. Matching jobs are posted to Discord via webhook.
+
+Runs automatically at 07:59, 13:29, and 20:19 Europe/Bucharest time via
+GitHub Actions, including daylight-saving-time changes.
+
+LinkedIn is not scraped because its terms prohibit unauthorized automated
+scraping. Use LinkedIn's own job alerts alongside this scraper.
 
 ## Local setup
 
@@ -35,8 +42,8 @@ it's what prevents duplicate notifications.
 2. Go to **Settings → Secrets and variables → Actions** in your repo.
 3. Add a repository secret named `DISCORD_WEBHOOK_URL` with your webhook URL.
 4. The workflow in `.github/workflows/scrape.yml` will run automatically at
-   06:00, 12:00, and 18:00 UTC. Adjust the cron schedule to your timezone
-   as needed. You can also trigger it manually from the **Actions** tab.
+   07:59, 13:29, and 20:19 Europe/Bucharest time. You can also trigger it
+   manually from the **Actions** tab.
 
 Each run scrapes, diffs against `seen_jobs.json` to avoid duplicate
 alerts, notifies Discord about new listings, and commits the updated
