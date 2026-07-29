@@ -1,0 +1,35 @@
+name: Job Scraper
+
+on:
+  schedule:
+    - cron: "0 6,12,18 * * *"   # 6am, 12pm, 6pm UTC — adjust to your timezone
+  workflow_dispatch:            # allows manual runs from the Actions tab
+
+permissions:
+  contents: write   # needed to commit updated seen_jobs.json back to the repo
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
+        run: python main.py
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Commit updated seen_jobs.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_jobs.json
+          git diff --quiet --cached || git commit -m "Update seen jobs"
+          git push
