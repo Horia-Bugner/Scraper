@@ -1,4 +1,7 @@
 [
+  "himalayas:https://himalayas.app/companies/rekluti/jobs/test-lead-2025-gru-st-000388",
+  "himalayas:https://himalayas.app/companies/softgames/jobs/senior-qa-manager-fully-remote",
+  "himalayas:https://himalayas.app/companies/thermalworks/jobs/quality-assurance-manager-europe",
   "https://eu-careers.europa.eu/en/job-opportunities/administrative-assistant-director/sg-com-2026-1380",
   "https://eu-careers.europa.eu/en/job-opportunities/agent-budgetaire/ec-2026-oil-523351",
   "https://eu-careers.europa.eu/en/job-opportunities/ai-and-digital-rights-analyst/fra-ta-digi-ad6-2026",
@@ -28,5 +31,11 @@
   "https://eu-careers.europa.eu/en/job-opportunities/secretary-unit/ec-2026-mena-469911",
   "https://eu-careers.europa.eu/en/job-opportunities/secretary/trade-com-2026-1535",
   "https://eu-careers.europa.eu/en/job-opportunities/social-worker-assistant-e-social-e/cj-ap-23-26",
-  "https://eu-careers.europa.eu/en/job-opportunities/statistical-officer/estat-lux-2026-ca-400589"
+  "https://eu-careers.europa.eu/en/job-opportunities/statistical-officer/estat-lux-2026-ca-400589",
+  "id:himalayas:https://himalayas.app/companies/rekluti/jobs/test-lead-2025-gru-st-000388",
+  "id:himalayas:https://himalayas.app/companies/softgames/jobs/senior-qa-manager-fully-remote",
+  "id:himalayas:https://himalayas.app/companies/thermalworks/jobs/quality-assurance-manager-europe",
+  "job:softgames|senior qa manager fully remote",
+  "job:thermalworks|quality assurance manager europe",
+  "job:xktalent inc rimutee|test lead 2025 gru st 000388"
 ]
