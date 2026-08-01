@@ -61,7 +61,7 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
-      - name: Commit updated seen_jobs.json
+      - name: Commit scraper state
         if: steps.schedule.outputs.run == 'true'
         run: |
           git config user.name "github-actions[bot]"

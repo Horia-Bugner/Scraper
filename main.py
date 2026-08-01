@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -20,6 +21,8 @@ load_dotenv()  # loads .env locally; no-op in CI (secrets come from env vars the
 
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 SEEN_JOBS_FILE = Path(__file__).parent / "seen_jobs.json"
+RUN_LOG_FILE = Path(__file__).parent / "scraper_log.md"
+RUN_AUDIT: dict[str, dict] = {}
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (personal job-alert script)"}
 
@@ -50,20 +53,37 @@ def is_target_title(title: str) -> bool:
     return bool(TARGET_TITLE_PATTERN.search(title))
 
 
-def meets_experience_preference(text: str) -> bool:
-    """Reject only listings that explicitly cap experience below five years."""
-    years = [
-        int(value)
-        for value in re.findall(
-            r"\b(\d{1,2})\+?\s*(?:years?|yrs?)\b", text, re.IGNORECASE
-        )
-    ]
-    return not years or max(years) >= 5
-
-
 def accepts_barcelona_remote_location(location: str) -> bool:
     """Return whether a remote job accepts applicants based in Barcelona."""
     return not location.strip() or bool(BARCELONA_REMOTE_REGIONS.search(location))
+
+
+def audit_listing(
+    source: str,
+    title: str,
+    company: str,
+    url: str,
+    location_ok: bool = True,
+) -> bool:
+    """Record every inspected listing and return whether it passes filters."""
+    if not is_target_title(title):
+        result = "Skipped: title"
+        matched = False
+    elif not location_ok:
+        result = "Skipped: location"
+        matched = False
+    else:
+        result = "Matched"
+        matched = True
+    key = f"{source}|{url or company + '|' + title}"
+    RUN_AUDIT[key] = {
+        "source": source,
+        "title": title or "(missing title)",
+        "company": company or "Unknown",
+        "url": url,
+        "result": result,
+    }
+    return matched
 
 
 def normalize_for_dedup(value: str) -> str:
@@ -108,22 +128,19 @@ def scrape_remoteok() -> list[dict]:
     jobs = []
     for item in listings:
         title = item.get("position") or item.get("title") or ""
-        if not is_target_title(title):
-            continue
         location = item.get("location") or ""
-        if not accepts_barcelona_remote_location(location):
-            continue
-        description = BeautifulSoup(
-            item.get("description", ""), "html.parser"
-        ).get_text(" ", strip=True)
-        if not meets_experience_preference(description):
-            continue
         url = item.get("url") or f"https://remoteok.com/remote-jobs/{item.get('id')}"
+        company = item.get("company", "Unknown")
+        if not audit_listing(
+            "Remote OK", title, company, url,
+            accepts_barcelona_remote_location(location),
+        ):
+            continue
         jobs.append({
             "id": url,
             "title": title,
             "url": url,
-            "company": item.get("company", "Unknown"),
+            "company": company,
             "source": "Remote OK",
         })
     return jobs
@@ -166,9 +183,10 @@ def scrape_eu_institutions(max_pages: int = 3) -> list[dict]:
 
             institution = cells[3].get_text(strip=True)
             listing_text = row.get_text(" ", strip=True)
-            if not is_target_title(title):
-                continue
-            if not TARGET_LOCATION_PATTERN.search(listing_text):
+            if not audit_listing(
+                "EU Careers", title, institution, url,
+                bool(TARGET_LOCATION_PATTERN.search(listing_text)),
+            ):
                 continue
 
             jobs.append({
@@ -202,21 +220,18 @@ def scrape_jobicy() -> list[dict]:
     for item in data.get("jobs", []):
         title = item.get("jobTitle", "")
         location = item.get("jobGeo", "")
-        description = BeautifulSoup(
-            item.get("jobDescription", ""), "html.parser"
-        ).get_text(" ", strip=True)
-        if not is_target_title(title):
-            continue
-        if not accepts_barcelona_remote_location(location):
-            continue
-        if not meets_experience_preference(description):
-            continue
         url = item.get("url", "")
+        company = item.get("companyName", "Unknown")
+        if not audit_listing(
+            "Jobicy", title, company, url,
+            accepts_barcelona_remote_location(location),
+        ):
+            continue
         jobs.append({
             "id": url,
             "title": title,
             "url": url,
-            "company": item.get("companyName", "Unknown"),
+            "company": company,
             "source": "Jobicy",
         })
     return jobs
@@ -239,13 +254,10 @@ def scrape_weworkremotely() -> list[dict]:
         raw_title = (item.findtext("title") or "").strip()
         # WWR titles are usually formatted "Company: Job Title"
         title = raw_title.split(":", 1)[-1].strip() if ":" in raw_title else raw_title
-        description = item.findtext("description") or ""
-        if not is_target_title(title):
-            continue
-        if not meets_experience_preference(description):
-            continue
         url = (item.findtext("link") or "").strip()
         company = raw_title.split(":", 1)[0].strip() if ":" in raw_title else "Unknown"
+        if not audit_listing("We Work Remotely", title, company, url):
+            continue
         jobs.append({
             "id": url,
             "title": title,
@@ -269,21 +281,18 @@ def scrape_remotive() -> list[dict]:
     for item in resp.json().get("jobs", []):
         title = item.get("title", "")
         location = item.get("candidate_required_location", "")
-        description = BeautifulSoup(
-            item.get("description", ""), "html.parser"
-        ).get_text(" ", strip=True)
-        if not is_target_title(title):
-            continue
-        if not accepts_barcelona_remote_location(location):
-            continue
-        if not meets_experience_preference(description):
-            continue
         url = item.get("url", "")
+        company = item.get("company_name", "Unknown")
+        if not audit_listing(
+            "Remotive", title, company, url,
+            accepts_barcelona_remote_location(location),
+        ):
+            continue
         jobs.append({
             "id": f"remotive:{item.get('id') or url}",
             "title": title,
             "url": url,
-            "company": item.get("company_name", "Unknown"),
+            "company": company,
             "source": "Remotive",
         })
     return jobs
@@ -309,20 +318,16 @@ def scrape_himalayas() -> list[dict]:
         resp.raise_for_status()
         for item in resp.json().get("jobs", []):
             title = item.get("title", "")
-            description = BeautifulSoup(
-                item.get("description", ""), "html.parser"
-            ).get_text(" ", strip=True)
-            if not is_target_title(title):
-                continue
-            if not meets_experience_preference(description):
-                continue
             url = item.get("applicationLink", "")
+            company = item.get("companyName", "Unknown")
+            if not audit_listing("Himalayas", title, company, url):
+                continue
             job_id = str(item.get("guid") or url)
             jobs_by_id[job_id] = {
                 "id": f"himalayas:{job_id}",
                 "title": title,
                 "url": url,
-                "company": item.get("companyName", "Unknown"),
+                "company": company,
                 "source": "Himalayas",
             }
     return list(jobs_by_id.values())
@@ -347,23 +352,22 @@ def scrape_arbeitnow(max_pages: int = 3) -> list[dict]:
             title = item.get("title", "")
             location = item.get("location", "")
             is_remote = bool(item.get("remote"))
-            description = BeautifulSoup(
-                item.get("description", ""), "html.parser"
-            ).get_text(" ", strip=True)
-            if not is_target_title(title):
-                continue
-            if not is_remote and not TARGET_LOCATION_PATTERN.search(location):
-                continue
-            if is_remote and location and not accepts_barcelona_remote_location(location):
-                continue
-            if not meets_experience_preference(description):
-                continue
             job_url = item.get("url", "")
+            company = item.get("company_name", "Unknown")
+            location_ok = (
+                bool(TARGET_LOCATION_PATTERN.search(location))
+                if not is_remote
+                else accepts_barcelona_remote_location(location)
+            )
+            if not audit_listing(
+                "Arbeitnow", title, company, job_url, location_ok
+            ):
+                continue
             jobs.append({
                 "id": f"arbeitnow:{item.get('slug') or job_url}",
                 "title": title,
                 "url": job_url,
-                "company": item.get("company_name", "Unknown"),
+                "company": company,
                 "source": "Arbeitnow",
             })
     return jobs
@@ -429,6 +433,74 @@ def notify_discord(jobs: list[dict]) -> list[dict]:
     return notified
 
 
+def write_run_log(matched_jobs, new_jobs, notified_jobs, scraper_errors) -> None:
+    """Write a readable audit of every listing inspected during this run."""
+    lines = [
+        "# Job scraper run log", "",
+        f"- Run time (UTC): {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
+        f"- Listings inspected: {len(RUN_AUDIT)}",
+        f"- Listings matching title/location: {len(matched_jobs)}",
+        f"- New listings: {len(new_jobs)}",
+        f"- Discord job notifications delivered: {len(notified_jobs)}",
+        f"- Scraper errors: {len(scraper_errors)}",
+        "- Experience filtering: disabled", "",
+    ]
+    if scraper_errors:
+        lines.extend(["## Errors", ""])
+        lines.extend(f"- {error}" for error in scraper_errors)
+        lines.append("")
+    lines.extend([
+        "## Listings inspected", "",
+        "| Source | Result | Company | Title | Link |",
+        "|---|---|---|---|---|",
+    ])
+    for entry in sorted(
+        RUN_AUDIT.values(),
+        key=lambda value: (value["source"], value["company"], value["title"]),
+    ):
+        clean = {
+            key: str(value).replace("|", "\\|").replace("\n", " ")
+            for key, value in entry.items()
+        }
+        link = f"[Open]({clean['url']})" if clean["url"] else ""
+        lines.append(
+            f"| {clean['source']} | {clean['result']} | {clean['company']} | "
+            f"{clean['title']} | {link} |"
+        )
+    RUN_LOG_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def notify_run_complete(matched_count, new_count, notified_count, error_count) -> None:
+    """Send one status message for every completed scraper run."""
+    if not DISCORD_WEBHOOK_URL:
+        return
+    status = "completed" if error_count == 0 else "completed with errors"
+    content = (
+        f"✅ **Job scraper {status}**\n"
+        f"Inspected: {len(RUN_AUDIT)} | Matched: {matched_count} | "
+        f"New: {new_count} | Posted: {notified_count} | Errors: {error_count}\n"
+        "Full run log attached."
+    )
+    try:
+        with RUN_LOG_FILE.open("rb") as log_file:
+            response = requests.post(
+                DISCORD_WEBHOOK_URL,
+                params={"wait": "true"},
+                data={"payload_json": json.dumps({"content": content})},
+                files={
+                    "files[0]": (
+                        RUN_LOG_FILE.name,
+                        log_file,
+                        "text/markdown",
+                    )
+                },
+                timeout=30,
+            )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print(f"Failed to send run status: {exc}", file=sys.stderr)
+
+
 # ---------------------------------------------------------------------------
 # 4. Main run
 # ---------------------------------------------------------------------------
@@ -436,12 +508,15 @@ def notify_discord(jobs: list[dict]) -> list[dict]:
 def main() -> None:
     seen_ids = load_seen_ids()
     all_jobs: list[dict] = []
+    scraper_errors = []
 
     for scraper in SCRAPERS:
         try:
             all_jobs.extend(scraper())
         except Exception as e:
-            print(f"Scraper {scraper.__name__} failed: {e}", file=sys.stderr)
+            error = f"{scraper.__name__}: {e}"
+            scraper_errors.append(error)
+            print(f"Scraper failed: {error}", file=sys.stderr)
 
     new_jobs = []
     keys_this_run = set(seen_ids)
@@ -451,6 +526,7 @@ def main() -> None:
             new_jobs.append(job)
             keys_this_run.update(keys)
 
+    notified_jobs = []
     if new_jobs:
         print(f"Found {len(new_jobs)} new job(s).")
         notified_jobs = notify_discord(new_jobs)
@@ -460,6 +536,11 @@ def main() -> None:
             save_seen_ids(seen_ids)
     else:
         print("No new jobs found.")
+
+    write_run_log(all_jobs, new_jobs, notified_jobs, scraper_errors)
+    notify_run_complete(
+        len(all_jobs), len(new_jobs), len(notified_jobs), len(scraper_errors)
+    )
 
 
 if __name__ == "__main__":

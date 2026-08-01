@@ -3,8 +3,13 @@
 Checks Jobicy, We Work Remotely, Remotive, Remote OK, Himalayas, Arbeitnow,
 and EU Careers for QA Manager, Test Lead, Test Manager, QA Director, and
 Software QA Manager openings. Results are limited to remote roles available
-from Barcelona or Barcelona-based roles and favor listings requiring at least
-five years of experience. Matching jobs are posted to Discord via webhook.
+from Barcelona or Barcelona-based roles. Experience requirements do not
+exclude roles. Matching jobs are posted to Discord via webhook.
+
+Every run sends a Discord status message, even when no new jobs are found.
+The message includes `scraper_log.md` as an attachment, listing every
+inspected role and the reason it matched or was skipped. A local run also
+leaves the latest copy of that file in the project folder.
 
 Runs automatically at 07:59, 13:29, and 20:19 Europe/Bucharest time via
 GitHub Actions, including daylight-saving-time changes.
