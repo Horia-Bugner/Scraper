@@ -49,6 +49,19 @@ BARCELONA_REMOTE_REGIONS = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+CLOSED_JOB_PATTERN = re.compile(
+    r"\b(?:"
+    r"no longer accepting applications|"
+    r"no longer available|"
+    r"position (?:has been|is) filled|"
+    r"job (?:has )?expired|"
+    r"job is closed|"
+    r"applications? (?:are |is )?closed|"
+    r"vacancy (?:has been|is) closed|"
+    r"this job was removed"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def is_target_title(title: str) -> bool:
@@ -67,10 +80,14 @@ def audit_listing(
     url: str,
     location_ok: bool = True,
     specific_job: bool = True,
+    active_job: bool = True,
 ) -> bool:
     """Record every inspected listing and return whether it passes filters."""
     if not specific_job:
         result = "Skipped: not a specific job page"
+        matched = False
+    elif not active_job:
+        result = "Skipped: closed or expired"
         matched = False
     elif not is_target_title(title):
         result = "Skipped: title"
@@ -441,6 +458,8 @@ def scrape_tavily() -> list[dict]:
                 "include_domains": domains,
                 "include_answer": False,
                 "include_images": False,
+                "include_raw_content": "text",
+                "time_range": "month",
             },
             timeout=30,
         )
@@ -449,10 +468,10 @@ def scrape_tavily() -> list[dict]:
             title = item.get("title", "").strip()
             url = item.get("url", "").strip()
             content = item.get("content", "") or ""
+            raw_content = item.get("raw_content", "") or ""
+            page_text = f"{title} {content} {raw_content}"
             company = company_from_search_title(title, source)
-            location_ok = accepts_barcelona_remote_location(
-                f"{title} {content}"
-            )
+            location_ok = accepts_barcelona_remote_location(page_text)
             if not audit_listing(
                 f"Tavily / {source}",
                 title,
@@ -460,6 +479,7 @@ def scrape_tavily() -> list[dict]:
                 url,
                 location_ok=location_ok,
                 specific_job=is_specific_job_page(source, url),
+                active_job=not bool(CLOSED_JOB_PATTERN.search(page_text)),
             ):
                 continue
             jobs.append({

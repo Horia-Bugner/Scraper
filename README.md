@@ -17,7 +17,9 @@ Runs automatically at 07:20 and 20:20 Europe/Bucharest time via
 GitHub Actions, including daylight-saving-time changes.
 
 The scraper does not log into or directly crawl those five commercial boards;
-it processes pages returned by Tavily's public web-search index.
+it processes pages returned by Tavily's public web-search index. Tavily
+results are limited to the last month and explicit closed/expired notices are
+excluded before notification.
 
 ## Local setup
 
