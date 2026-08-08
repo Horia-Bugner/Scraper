@@ -12,6 +12,7 @@ import sys
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -20,6 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()  # loads .env locally; no-op in CI (secrets come from env vars there)
 
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 SEEN_JOBS_FILE = Path(__file__).parent / "seen_jobs.json"
 RUN_LOG_FILE = Path(__file__).parent / "scraper_log.md"
 RUN_AUDIT: dict[str, dict] = {}
@@ -64,9 +66,13 @@ def audit_listing(
     company: str,
     url: str,
     location_ok: bool = True,
+    specific_job: bool = True,
 ) -> bool:
     """Record every inspected listing and return whether it passes filters."""
-    if not is_target_title(title):
+    if not specific_job:
+        result = "Skipped: not a specific job page"
+        matched = False
+    elif not is_target_title(title):
         result = "Skipped: title"
         matched = False
     elif not location_ok:
@@ -101,11 +107,13 @@ def job_keys(job: dict) -> set[str]:
     """
     title = normalize_for_dedup(job.get("title", ""))
     company = normalize_for_dedup(job.get("company", ""))
-    return {
+    keys = {
         str(job["id"]),  # legacy key retained for existing seen_jobs.json files
         f"id:{job['id']}",
-        f"job:{company}|{title}",
     }
+    if company and company != "unknown":
+        keys.add(f"job:{company}|{title}")
+    return keys
 
 
 # ---------------------------------------------------------------------------
@@ -373,6 +381,97 @@ def scrape_arbeitnow(max_pages: int = 3) -> list[dict]:
     return jobs
 
 
+TAVILY_JOB_SOURCES = {
+    "LinkedIn": ["linkedin.com"],
+    "Xing": ["xing.com"],
+    "StepStone": ["stepstone.es", "stepstone.de", "stepstone.com"],
+    "Indeed": ["indeed.com", "indeed.es"],
+    "Glassdoor": ["glassdoor.com", "glassdoor.es"],
+}
+
+
+def is_specific_job_page(source: str, url: str) -> bool:
+    """Reject search/category pages while retaining individual job pages."""
+    lowered = url.lower()
+    patterns = {
+        "LinkedIn": ("/jobs/view/",),
+        "Xing": ("/jobs/",),
+        "StepStone": ("/stellenangebote--", "/job/", "/jobs/"),
+        "Indeed": ("viewjob", "/rc/clk", "jk="),
+        "Glassdoor": ("/job-listing/", "joblisting"),
+    }
+    if not any(marker in lowered for marker in patterns[source]):
+        return False
+    path = urlparse(url).path.rstrip("/").lower()
+    return path not in {"", "/jobs", "/job", "/jobs/search"}
+
+
+def company_from_search_title(title: str, source: str) -> str:
+    """Best-effort company extraction from a search-result page title."""
+    cleaned = re.sub(
+        rf"\s*[|\-–—]\s*{re.escape(source)}.*$", "", title, flags=re.IGNORECASE
+    ).strip()
+    match = re.search(r"\s+(?:at|bei)\s+(.+)$", cleaned, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    parts = [part.strip() for part in re.split(r"\s+[|–—]\s+", cleaned)]
+    return parts[-1] if len(parts) > 1 else "Unknown"
+
+
+def scrape_tavily() -> list[dict]:
+    """Find publicly indexed job pages on five major boards via Tavily."""
+    if not TAVILY_API_KEY:
+        raise RuntimeError("TAVILY_API_KEY is not configured")
+
+    query = (
+        '("QA Manager" OR "Quality Assurance Manager" OR "Test Lead" OR '
+        '"Test Manager" OR "QA Director" OR "Software QA Manager") '
+        '(Barcelona OR remote OR Spain OR Europe) job'
+    )
+    jobs = []
+    for source, domains in TAVILY_JOB_SOURCES.items():
+        response = requests.post(
+            "https://api.tavily.com/search",
+            headers=HEADERS,
+            json={
+                "api_key": TAVILY_API_KEY,
+                "query": query,
+                "search_depth": "basic",
+                "max_results": 10,
+                "include_domains": domains,
+                "include_answer": False,
+                "include_images": False,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        for item in response.json().get("results", []):
+            title = item.get("title", "").strip()
+            url = item.get("url", "").strip()
+            content = item.get("content", "") or ""
+            company = company_from_search_title(title, source)
+            location_ok = accepts_barcelona_remote_location(
+                f"{title} {content}"
+            )
+            if not audit_listing(
+                f"Tavily / {source}",
+                title,
+                company,
+                url,
+                location_ok=location_ok,
+                specific_job=is_specific_job_page(source, url),
+            ):
+                continue
+            jobs.append({
+                "id": f"tavily:{source.lower()}:{url}",
+                "title": title,
+                "url": url,
+                "company": company,
+                "source": f"Tavily / {source}",
+            })
+    return jobs
+
+
 SCRAPERS = [
     scrape_remoteok,
     scrape_jobicy,
@@ -381,6 +480,7 @@ SCRAPERS = [
     scrape_himalayas,
     scrape_arbeitnow,
     scrape_eu_institutions,
+    scrape_tavily,
     # add more scraper functions here as you build them out
 ]
 
