@@ -13,7 +13,7 @@ The message includes `scraper_log.md` as an attachment, listing every
 inspected role and the reason it matched or was skipped. A local run also
 leaves the latest copy of that file in the project folder.
 
-Runs automatically at 07:59, 13:29, and 20:19 Europe/Bucharest time via
+Runs automatically at 07:20 and 20:20 Europe/Bucharest time via
 GitHub Actions, including daylight-saving-time changes.
 
 The scraper does not log into or directly crawl those five commercial boards;
@@ -42,8 +42,8 @@ python main.py
 2. Put it in `.env` locally as `TAVILY_API_KEY`.
 3. Add it to GitHub Actions as a repository secret named `TAVILY_API_KEY`.
 
-The integration uses five basic searches per run. At three runs per day this
-uses approximately 450 of Tavily's 1,000 free monthly credits.
+The integration uses five basic searches per run. At two runs per day this
+uses approximately 300 of Tavily's 1,000 free monthly credits.
 
 ## Adding a job source
 
@@ -60,7 +60,7 @@ it's what prevents duplicate notifications.
 3. Add a repository secret named `DISCORD_WEBHOOK_URL` with your webhook URL.
 4. Add a repository secret named `TAVILY_API_KEY` with your Tavily API key.
 5. The workflow in `.github/workflows/scrape.yml` will run automatically at
-   07:59, 13:29, and 20:19 Europe/Bucharest time. You can also trigger it
+   07:20 and 20:20 Europe/Bucharest time. You can also trigger it
    manually from the **Actions** tab.
 
 Each run scrapes, diffs against `seen_jobs.json` to avoid duplicate
