@@ -39,10 +39,13 @@
   "id:himalayas:https://himalayas.app/companies/thermalworks/jobs/quality-assurance-manager-europe",
   "id:tavily:linkedin:https://www.linkedin.com/jobs/view/quality-assurance-manager-at-enterprise-europe-network-spain-4443757772",
   "id:tavily:linkedin:https://www.linkedin.com/jobs/view/regional-quality-assurance-manager-at-clear-4382429843",
+  "id:tavily:stepstone:https://stepstone.de/jobs/quality-assurance-manager",
   "id:tavily:stepstone:https://www.stepstone.de/jobs/qa-manager",
   "id:tavily:stepstone:https://www.stepstone.de/jobs/qa-manager/in-hessen",
   "id:tavily:stepstone:https://www.stepstone.de/jobs/qa-manager/in-rheinland",
   "id:tavily:stepstone:https://www.stepstone.de/jobs/qa-manager/in-wiesbaden",
+  "id:tavily:stepstone:https://www.stepstone.de/jobs/quality-assurance-manager?action=facet_selected%3Bage%3Bage_7&ag=age_7",
+  "id:tavily:stepstone:https://www.stepstone.de/jobs/vollzeit/qa-manager?action=facet_selected%3Bworktypes%3B80001",
   "job:15 jul 2025|qa manager 7 jobs stellenangebote in wiesbaden 15 jul 2025",
   "job:9 aug 2026|qa manager 12 jobs stellenangebote in hessen 9 aug 2026",
   "job:9 aug 2026|qa manager 17 jobs stellenangebote in rheinland 9 aug 2026",
@@ -52,8 +55,11 @@
   "job:xktalent inc rimutee|test lead 2025 gru st 000388",
   "tavily:linkedin:https://www.linkedin.com/jobs/view/quality-assurance-manager-at-enterprise-europe-network-spain-4443757772",
   "tavily:linkedin:https://www.linkedin.com/jobs/view/regional-quality-assurance-manager-at-clear-4382429843",
+  "tavily:stepstone:https://stepstone.de/jobs/quality-assurance-manager",
   "tavily:stepstone:https://www.stepstone.de/jobs/qa-manager",
   "tavily:stepstone:https://www.stepstone.de/jobs/qa-manager/in-hessen",
   "tavily:stepstone:https://www.stepstone.de/jobs/qa-manager/in-rheinland",
-  "tavily:stepstone:https://www.stepstone.de/jobs/qa-manager/in-wiesbaden"
+  "tavily:stepstone:https://www.stepstone.de/jobs/qa-manager/in-wiesbaden",
+  "tavily:stepstone:https://www.stepstone.de/jobs/quality-assurance-manager?action=facet_selected%3Bage%3Bage_7&ag=age_7",
+  "tavily:stepstone:https://www.stepstone.de/jobs/vollzeit/qa-manager?action=facet_selected%3Bworktypes%3B80001"
 ]
