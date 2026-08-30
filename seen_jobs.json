@@ -1,4 +1,5 @@
 [
+  "himalayas:https://himalayas.app/companies/digitalforms/jobs/test-lead-ai-validation-integration",
   "himalayas:https://himalayas.app/companies/headspin/jobs/performance-test-lead",
   "himalayas:https://himalayas.app/companies/neogen-corporation/jobs/animal-safety-qa-manager-3240881122",
   "himalayas:https://himalayas.app/companies/rekluti/jobs/test-lead-2025-gru-st-000388",
@@ -34,6 +35,7 @@
   "https://eu-careers.europa.eu/en/job-opportunities/secretary/trade-com-2026-1535",
   "https://eu-careers.europa.eu/en/job-opportunities/social-worker-assistant-e-social-e/cj-ap-23-26",
   "https://eu-careers.europa.eu/en/job-opportunities/statistical-officer/estat-lux-2026-ca-400589",
+  "id:himalayas:https://himalayas.app/companies/digitalforms/jobs/test-lead-ai-validation-integration",
   "id:himalayas:https://himalayas.app/companies/headspin/jobs/performance-test-lead",
   "id:himalayas:https://himalayas.app/companies/neogen-corporation/jobs/animal-safety-qa-manager-3240881122",
   "id:himalayas:https://himalayas.app/companies/rekluti/jobs/test-lead-2025-gru-st-000388",
@@ -54,6 +56,7 @@
   "job:25 aug 2026|qa manager 13 jobs stellenangebote in dreieich 25 aug 2026",
   "job:9 aug 2026|qa manager 12 jobs stellenangebote in hessen 9 aug 2026",
   "job:9 aug 2026|qa manager 17 jobs stellenangebote in rheinland 9 aug 2026",
+  "job:digital forms|test lead ai validation integration",
   "job:headspin|performance test lead",
   "job:neogen corporation|animal safety qa manager",
   "job:softgames|senior qa manager fully remote",
