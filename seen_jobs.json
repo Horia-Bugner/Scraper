@@ -1,4 +1,5 @@
 [
+  "himalayas:https://himalayas.app/companies/affidea-bv/jobs/test-manager",
   "himalayas:https://himalayas.app/companies/bromcom-computers-plc/jobs/technical-quality-assurance-manager",
   "himalayas:https://himalayas.app/companies/cxm/jobs/payment-integrations-technical-qa-manager",
   "himalayas:https://himalayas.app/companies/digitalforms/jobs/test-lead-ai-validation-integration",
@@ -37,6 +38,7 @@
   "https://eu-careers.europa.eu/en/job-opportunities/secretary/trade-com-2026-1535",
   "https://eu-careers.europa.eu/en/job-opportunities/social-worker-assistant-e-social-e/cj-ap-23-26",
   "https://eu-careers.europa.eu/en/job-opportunities/statistical-officer/estat-lux-2026-ca-400589",
+  "id:himalayas:https://himalayas.app/companies/affidea-bv/jobs/test-manager",
   "id:himalayas:https://himalayas.app/companies/bromcom-computers-plc/jobs/technical-quality-assurance-manager",
   "id:himalayas:https://himalayas.app/companies/cxm/jobs/payment-integrations-technical-qa-manager",
   "id:himalayas:https://himalayas.app/companies/digitalforms/jobs/test-lead-ai-validation-integration",
@@ -70,6 +72,7 @@
   "job:25 aug 2026|qa manager 13 jobs stellenangebote in dreieich 25 aug 2026",
   "job:9 aug 2026|qa manager 12 jobs stellenangebote in hessen 9 aug 2026",
   "job:9 aug 2026|qa manager 17 jobs stellenangebote in rheinland 9 aug 2026",
+  "job:affidea bv|test manager",
   "job:bromcom computers plc|technical quality assurance manager",
   "job:cxm|payment integrations technical qa manager",
   "job:der firma vital convenience vc gmbh osi europe in erkelenz|qa manager m w d job bei der firma vital convenience vc gmbh osi europe in erkelenz",
