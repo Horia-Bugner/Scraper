@@ -2,12 +2,8 @@ name: Job Scraper
 
 on:
   schedule:
-    # Winter in Europe/Bucharest (UTC+2)
+    # Once a day at 05:20 UTC (07:20 Bucharest in winter, 08:20 in summer)
     - cron: "20 5 * * *"
-    - cron: "20 18 * * *"
-    # Summer in Europe/Bucharest (UTC+3)
-    - cron: "20 4 * * *"
-    - cron: "20 17 * * *"
   workflow_dispatch:
 
 permissions:
@@ -21,47 +17,22 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Bucharest schedule
-        id: schedule
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_SCHEDULE: ${{ github.event.schedule }}
-        run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          offset="$(TZ=Europe/Bucharest date +%z)"
-          if [[ "$offset" == "+0300" && "$EVENT_SCHEDULE" =~ ^(20\ 4|20\ 17) ]] ||
-             [[ "$offset" == "+0200" && "$EVENT_SCHEDULE" =~ ^(20\ 5|20\ 18) ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/checkout@v4
-        if: steps.schedule.outputs.run == 'true'
 
       - uses: actions/setup-python@v5
-        if: steps.schedule.outputs.run == 'true'
         with:
           python-version: "3.12"
 
       - name: Install dependencies
-        if: steps.schedule.outputs.run == 'true'
         run: pip install -r requirements.txt
 
       - name: Run scraper
-        if: steps.schedule.outputs.run == 'true'
         run: python main.py
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
 
       - name: Commit scraper state
-        if: steps.schedule.outputs.run == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

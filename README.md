@@ -13,8 +13,8 @@ The message includes `scraper_log.md` as an attachment, listing every
 inspected role and the reason it matched or was skipped. A local run also
 leaves the latest copy of that file in the project folder.
 
-Runs automatically at 07:20 and 20:20 Europe/Bucharest time via
-GitHub Actions, including daylight-saving-time changes.
+Runs automatically once a day at 05:20 UTC (07:20 Bucharest in winter,
+08:20 in summer) via GitHub Actions.
 
 The scraper does not log into or directly crawl those five commercial boards;
 it processes pages returned by Tavily's public web-search index. Tavily
